@@ -503,18 +503,21 @@ def rotatePivot(rotation):
 
 def world2local(a, b, depth):
     """
-    world2local(Vector  a, Vector b, float depth)
-    This function will create a vector to translate between points a and b based on a depth.
+    Returns a scaled transformation vector between the given vectors.
+
+    This is calculated as the reflection along the z-axis of the normalized vector pointing from a to b, scaled by the given depth.
+
+    Parameters:
+    a -- Vector used as the origin for the transformation;
+    b -- Vector used as the target for the transformation;
+    depth -- float value used to scale the normalized transformation vector.
+
+    Returns:
+    Vector indicating transformation from a to b, scaled by depth.
+
     """
-    # calculate angles based on 3 dimensional trigonometry
-    thetaA = atan( (a.z-b.z)/( sqrt( pow(a.x-b.x, 2) + pow(a.y-b.y, 2) ) ) )
-    thetaB = atan( (a.y-b.y)/(a.x-b.x) )
-    # calculate the vector
-    distVec = Vector([cos(thetaB) * cos(thetaA) * depth,
-    sin(thetaB) * cos(thetaA) * depth,
-    sin(thetaA) * depth])
-    # return the vector
-    return distVec
+    r = (b - a).normalized() * depth
+    return r.reflect(Vector([0, 0, 1]))
 
 
 # Register functions #
