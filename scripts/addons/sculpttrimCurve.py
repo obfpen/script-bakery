@@ -44,7 +44,7 @@ bl_info = {
     "warning": "Public Beta",
     "wiki_url": "",
     "tracker_url": "",
-    "category": "View3D"}
+    "category": "3D View"}
 
 
 class initialize(bpy.types.Panel):
