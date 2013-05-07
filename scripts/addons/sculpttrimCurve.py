@@ -24,7 +24,7 @@ Description:
 Warning:
     This script is currently in a public Beta release, there are bugs and I recommend you take a backup of your work, I take no responsibility in any part either direct or in-direct at the loss of any work. Use at your own risk.
 KNOWN BUGS:
-    On line 367-ish I extrude away from the camera, this needs to be reworked as it is un-predictable.
+    On line 362-ish I extrude away from the camera, this needs to be reworked as it is un-predictable.
 """
 
 import bpy
@@ -242,9 +242,20 @@ class OBJECT_OT_trimCurve(bpy.types.Operator):
 
     def execute(self, context):
         """
-        We execute all the code here based on props
+        Trims the mesh object specified by Object.TCinitObject using an
+        extruded version of the curve named by Object.TCinitCurve, applied with
+        a Boolean modifier.
         """
-        # short code
+
+        def select_exclusively_and_activate(object_to_select):
+            """Helper function that ensures only the passed object is selected
+            and activated.
+            """
+            bpy.ops.object.select_all(action="DESELECT")
+            object_to_select.select = True
+            context.scene.objects.active = object_to_select
+
+        # The operator's properties extend the Object and Scene data.
         obj = context.object
         scn = context.scene
 
@@ -267,10 +278,8 @@ class OBJECT_OT_trimCurve(bpy.types.Operator):
                         ob.name.startswith("GP_Layer")):
                         # create curve variable
                         curve = ob
-                        bpy.ops.object.select_all(action='DESELECT')
+                        select_exclusively_and_activate(curve)
                         # set curve resolution from default 12 to 1
-                        curve.select = True
-                        bpy.context.scene.objects.active = curve
                         bpy.context.object.data.resolution_u = 1
         else:
             # check if curve exists
@@ -291,10 +300,7 @@ class OBJECT_OT_trimCurve(bpy.types.Operator):
             self.report({'WARNING'}, "No mesh selected.")
             return{'FINISHED'}
 
-        # select curve
-        bpy.ops.object.select_all(action='DESELECT')
-        curve.select = True
-        bpy.context.scene.objects.active = curve
+        select_exclusively_and_activate(curve)
         # edit curve
         bpy.ops.object.mode_set(mode='EDIT')
         bpy.ops.curve.select_all(action='SELECT')
@@ -308,10 +314,7 @@ class OBJECT_OT_trimCurve(bpy.types.Operator):
 
         # rotate curve pivot to view for local transformations #
 
-        # select curve
-        bpy.ops.object.select_all(action='DESELECT')
-        curve.select = True
-        bpy.context.scene.objects.active = curve
+        select_exclusively_and_activate(curve)
         # center origin
         bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY', center='MEDIAN')
         # get cursor location, set to vector to break link
@@ -329,11 +332,7 @@ class OBJECT_OT_trimCurve(bpy.types.Operator):
         bpy.context.scene.cursor_location = curve.location
         # rotate around cursor
         context.space_data.pivot_point = "CURSOR"
-        # select none
-        bpy.ops.object.select_all(action='DESELECT')
-        # select curve
-        curve.select = True
-        bpy.context.scene.objects.active = curve
+        select_exclusively_and_activate(curve)
         # apply rotation
         bpy.ops.object.transform_apply(location=False, rotation=True,
                                        scale=False)
@@ -345,14 +344,10 @@ class OBJECT_OT_trimCurve(bpy.types.Operator):
         bpy.context.scene.cursor_location = cursorInit
 
         # delete empty
-        bpy.ops.object.select_all(action='DESELECT')
-        empty.select = True
-        bpy.context.scene.objects.active = empty
+        select_exclusively_and_activate(empty)
         bpy.ops.object.delete(use_global=False)
 
-        # select curve
-        curve.select = True
-        bpy.context.scene.objects.active = curve
+        select_exclusively_and_activate(curve)
 
         # move curve towards camera #
         # calculate correct xyz values based on view angle #
@@ -500,10 +495,16 @@ class OBJECT_OT_trimCurve(bpy.types.Operator):
                 if mod.type == 'BOOLEAN':
                     bpy.ops.object.modifier_apply(apply_as='DATA',
                                                   modifier=mod.name)
+
+            # The following lines cannot be replaced by
+            # select_exclusively_and_activate(curve) as the activation causes
+            # an error.
+
             # deselect mesh
             bpy.ops.object.select_all(action='DESELECT')
             # select curve
             curve.select = True
+
             # delete curve
             bpy.ops.object.delete(use_global=False)
 
