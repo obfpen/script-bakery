@@ -66,71 +66,6 @@ class TrimCurvesPanel(bpy.types.Panel):
         """
         return context.mode in ['OBJECT', 'SCULPT', 'EDIT_MESH']
 
-    def propCalls():
-        """
-        create props for layout
-        a prop is an input field
-        this is not required to be in a function, but I like to keep the code clean.
-        """
-        # create object and curve slot for dropdown
-        bpy.types.Object.TCinitObject = bpy.props.StringProperty()
-        bpy.types.Object.TCinitCurve = bpy.props.StringProperty()
-        # curve or grease pencil enum
-        bpy.types.Scene.TCinitCurveType = bpy.props.EnumProperty(
-            items = [('1', 'Grease Pencil', 'grease'),
-                     ('2', 'Curve', 'curve')],
-            name = "curveType")
-        # create initial value boxes
-        bpy.types.Scene.TCinitDepth = FloatProperty(
-            name = "Depth", description = "depth from view", default = 5.00,
-            min = -100, max = 100)
-        bpy.types.Scene.TCinitDivision = FloatProperty(
-            name = "Division", description = "Division Spacing", default = 0.5,
-            min = -100, max = 100)
-        bpy.types.Scene.TCinitExtrusion = FloatProperty(
-            name = "Extrusion", description = "Extrusion Depth", default = 5,
-            min = -100, max = 100)
-        # axis enum
-        bpy.types.Scene.TCinitAxis = bpy.props.EnumProperty(
-            items = [('1', '3D Cursor', 'cursor'),
-                     ('2', 'X', 'x'),
-                     ('3', 'Y', 'y')],
-            name = "axisType")
-        # apply modifier
-        bpy.types.Scene.TCinitApplyMod = BoolProperty(
-            name = "Apply Boolean",
-            description = "Apply Boolean?",
-            default = True)
-        # is cyclic or extrude
-        bpy.types.Scene.TCinitCyclic = BoolProperty(
-            name = "Cyclic",
-            description = "Disable extrusion and enable cyclic hole?",
-            default = False)
-        # reverse direction
-        bpy.types.Scene.TCinitReverseDir = BoolProperty(
-            name = "Reverse Direction",
-            description = "Reverse Direction",
-            default = False)
-        # reverse depth
-        bpy.types.Scene.TCinitReverseDepth=  BoolProperty(
-            name = "Reverse Depth",
-            description = "Reverse Depth of extrusion",
-            default = False)
-        # reverse trim
-        bpy.types.Scene.TCinitReverseTrim = BoolProperty(
-            name = "Reverse Trim",
-            description = "Reverse Trim",
-            default = False)
-        # return to mode enum
-        bpy.types.Scene.TCinitReturnMode = bpy.props.EnumProperty(
-            items = [('1', 'Sculpt', 'sculpt'),
-                     ('2', 'Object', 'object'),
-                     ('3', 'Edit', 'edit')],
-            name = "returnMode")
-
-    # Initiate prop calls
-    propCalls()
-
     def draw(self, context):
         """
         Lays out and draws the panel.
@@ -200,6 +135,71 @@ class OBJECT_OT_trimCurve(bpy.types.Operator):
 
     bl_idname = "trim.curves"
     bl_label = "Trim Curve"
+
+    def propCalls():
+        """
+        create props for layout
+        a prop is an input field
+        this is not required to be in a function, but I like to keep the code clean.
+        """
+        # create object and curve slot for dropdown
+        bpy.types.Object.TCinitObject = bpy.props.StringProperty()
+        bpy.types.Object.TCinitCurve = bpy.props.StringProperty()
+        # curve or grease pencil enum
+        bpy.types.Scene.TCinitCurveType = bpy.props.EnumProperty(
+            items = [('1', 'Grease Pencil', 'grease'),
+                     ('2', 'Curve', 'curve')],
+            name = "curveType")
+        # create initial value boxes
+        bpy.types.Scene.TCinitDepth = FloatProperty(
+            name = "Depth", description = "depth from view", default = 5.00,
+            min = -100, max = 100)
+        bpy.types.Scene.TCinitDivision = FloatProperty(
+            name = "Division", description = "Division Spacing", default = 0.5,
+            min = -100, max = 100)
+        bpy.types.Scene.TCinitExtrusion = FloatProperty(
+            name = "Extrusion", description = "Extrusion Depth", default = 5,
+            min = -100, max = 100)
+        # axis enum
+        bpy.types.Scene.TCinitAxis = bpy.props.EnumProperty(
+            items = [('1', '3D Cursor', 'cursor'),
+                     ('2', 'X', 'x'),
+                     ('3', 'Y', 'y')],
+            name = "axisType")
+        # apply modifier
+        bpy.types.Scene.TCinitApplyMod = BoolProperty(
+            name = "Apply Boolean",
+            description = "Apply Boolean?",
+            default = True)
+        # is cyclic or extrude
+        bpy.types.Scene.TCinitCyclic = BoolProperty(
+            name = "Cyclic",
+            description = "Disable extrusion and enable cyclic hole?",
+            default = False)
+        # reverse direction
+        bpy.types.Scene.TCinitReverseDir = BoolProperty(
+            name = "Reverse Direction",
+            description = "Reverse Direction",
+            default = False)
+        # reverse depth
+        bpy.types.Scene.TCinitReverseDepth=  BoolProperty(
+            name = "Reverse Depth",
+            description = "Reverse Depth of extrusion",
+            default = False)
+        # reverse trim
+        bpy.types.Scene.TCinitReverseTrim = BoolProperty(
+            name = "Reverse Trim",
+            description = "Reverse Trim",
+            default = False)
+        # return to mode enum
+        bpy.types.Scene.TCinitReturnMode = bpy.props.EnumProperty(
+            items = [('1', 'Sculpt', 'sculpt'),
+                     ('2', 'Object', 'object'),
+                     ('3', 'Edit', 'edit')],
+            name = "returnMode")
+
+    # Initiate prop calls
+    propCalls()
 
     def execute(self, context):
         """
@@ -539,8 +539,8 @@ def world2local(a, b, depth):
 # Register functions #
 def register():
     # initialize classes #
-    bpy.utils.register_class(TrimCurvesPanel)
     bpy.utils.register_class(OBJECT_OT_trimCurve)
+    bpy.utils.register_class(TrimCurvesPanel)
 
 
 def unregister():
