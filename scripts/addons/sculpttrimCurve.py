@@ -24,7 +24,7 @@ Description:
 Warning:
     This script is currently in a public Beta release, there are bugs and I recommend you take a backup of your work, I take no responsibility in any part either direct or in-direct at the loss of any work. Use at your own risk.
 KNOWN BUGS:
-    On line 315-ish I extrude away from the camera, this needs to be reworked as it is un-predictable.
+    On line 328-ish I extrude away from the camera, this needs to be reworked as it is un-predictable.
 """
 
 from math import *
@@ -133,45 +133,58 @@ class TrimCurvesPanel(bpy.types.Panel):
 
     def draw(self, context):
         """
-        draw will create our panel using the pre-defined settings from propCalls
+        Lays out and draws the panel.
         """
-        # Short Code
         obj = context.object
         scn = context.scene
-        # create column layout
+
+        # The Toolshelf region makes a column-based layout most appropriate.
         layout = self.layout
         col = layout.column()
+
         # Create layout in a try except so we can return a custom error
         try:
             # layout items
             col.label("Curve Type")
             col.prop(scn, 'TCinitCurveType', text = '')
+
             # object
             col.label("Object")
-            col.prop_search(obj, "TCinitObject",  scn, "objects", text = '',
+            col.prop_search(obj, "TCinitObject",
+                            scn, "objects",
+                            text = '',
                             icon = 'MESH_DATA')
+
             # curve
             if scn.TCinitCurveType == '2':
                 col.label("Curve")
-                col.prop_search(obj, "TCinitCurve",  scn, "objects", text = '',
+                col.prop_search(obj, "TCinitCurve",
+                                scn, "objects",
+                                text = '',
                                 icon = 'CURVE_DATA')
+
             # options
             col.prop(scn, "TCinitCyclic")
+
             col.label("Depth Cut")
             col.prop(scn, "TCinitDepth", text = '')
+
             col.label("Division Spacing")
             col.prop(scn, "TCinitDivision", text = '')
+
             # if not cyclic show these options
             if scn.TCinitCyclic == False:
                 col.label("Extrusion Depth")
                 col.prop(scn, "TCinitExtrusion", text = '')
                 col.prop(scn, "TCinitAxis")
+
             # more options
             col.prop(scn, "TCinitApplyMod")
             col.prop(scn, "TCinitReverseDir")
             col.prop(scn, "TCinitReverseDepth")
             col.prop(scn, "TCinitReverseTrim")
             col.prop(scn, "TCinitReturnMode")
+
             # execute button
             layout.operator("trim.curves")
         except:
