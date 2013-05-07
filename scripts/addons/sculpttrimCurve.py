@@ -24,7 +24,7 @@ Description:
 Warning:
     This script is currently in a public Beta release, there are bugs and I recommend you take a backup of your work, I take no responsibility in any part either direct or in-direct at the loss of any work. Use at your own risk.
 KNOWN BUGS:
-    On line 312-ish I extrude away from the camera, this needs to be reworked as it is un-predictable.
+    On line 315-ish I extrude away from the camera, this needs to be reworked as it is un-predictable.
 """
 
 from math import *
@@ -47,21 +47,24 @@ bl_info = {
     "category": "3D View"}
 
 
-class initialize(bpy.types.Panel):
+class TrimCurvesPanel(bpy.types.Panel):
 
     """
-    Creates the panel with controls, inherits from bpy.types.Panel
+    Creates the 'Trim Curves Utility' panel, which will appear in the toolshelf
+    of the 3D view when in Object, Edit, or Sculpt mode.
     """
 
+    bl_idname = "VIEW3D_PT_trim_curves"
     bl_label = "Trim Curves Utility"
     bl_space_type = "VIEW_3D"
     bl_region_type = "TOOLS"
 
-    # Our class method will specify which modes this script can be executed in,
-    # EDIT has been omitted for cleanliness, but would work.
     @classmethod
-    def poll(self, context):
-        return(bpy.context.mode == 'OBJECT' or 'SCULPT')
+    def poll(cls, context):
+        """Returns True, indicating that the panel should be displayed, if the
+        current context is appropriate for this tool.
+        """
+        return context.mode in ['OBJECT', 'SCULPT', 'EDIT_MESH']
 
     def propCalls():
         """
@@ -523,11 +526,11 @@ def world2local(a, b, depth):
 # Register functions #
 def register():
     # initialize classes #
-    bpy.utils.register_class(initialize)
+    bpy.utils.register_class(TrimCurvesPanel)
     bpy.utils.register_class(OBJECT_OT_trimCurve)
 
 
 def unregister():
     # uninitialize classes #
-    bpy.utils.unregister_class(initialize)
+    bpy.utils.unregister_class(TrimCurvesPanel)
     bpy.utils.register_class(OBJECT_OT_trimCurve)
