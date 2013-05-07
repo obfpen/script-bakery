@@ -24,7 +24,7 @@ Description:
 Warning:
     This script is currently in a public Beta release, there are bugs and I recommend you take a backup of your work, I take no responsibility in any part either direct or in-direct at the loss of any work. Use at your own risk.
 KNOWN BUGS:
-    On line 328-ish I extrude away from the camera, this needs to be reworked as it is un-predictable.
+    On line 369-ish I extrude away from the camera, this needs to be reworked as it is un-predictable.
 """
 
 from math import *
@@ -50,81 +50,104 @@ bl_info = {
 class TrimCurvesPanel(bpy.types.Panel):
 
     """
-    Creates the 'Trim Curves Utility' panel, which will appear in the toolshelf
-    of the 3D view when in Object, Edit, or Sculpt mode.
+    Creates the 'Trim Mesh with Curve' panel, which will appear in the
+    toolshelf of the 3D view when in Object, Edit, or Sculpt mode if there is
+    at least one mesh object in the current scene.
     """
 
     bl_idname = "VIEW3D_PT_trim_curves"
-    bl_label = "Trim Curves Utility"
+    bl_label = "Trim Mesh with Curve"
     bl_space_type = "VIEW_3D"
     bl_region_type = "TOOLS"
 
     @classmethod
     def poll(cls, context):
         """Returns True, indicating that the panel should be displayed, if the
-        current context is appropriate for this tool.
+        current context is appropriate for this tool and there is at least one
+        trimmable object in the current scene.
         """
-        return context.mode in ['OBJECT', 'SCULPT', 'EDIT_MESH']
+
+        def scene_has_mesh_objects():
+            """Helper function that looks for mesh objects in the current
+            scene.
+            """
+            result = False
+            for obj in context.scene.objects:
+                if "MESH" == obj.type:
+                    result = True
+                    break
+            return result
+
+        return (context.mode in ["OBJECT", "SCULPT", "EDIT_MESH"] and
+                scene_has_mesh_objects())
 
     def draw(self, context):
         """
         Lays out and draws the panel.
         """
-        obj = context.object
-        scn = context.scene
 
         # The Toolshelf region makes a column-based layout most appropriate.
         layout = self.layout
         col = layout.column()
 
-        # Create layout in a try except so we can return a custom error
-        try:
-            # layout items
-            col.label("Curve Type")
-            col.prop(scn, 'TCinitCurveType', text = '')
+        # The operator's properties extend the Object and Scene data.
+        obj = context.object
+        scn = context.scene
 
-            # object
-            col.label("Object")
-            col.prop_search(obj, "TCinitObject",
+        # Although text="" is repeating the default value for the parameter,
+        # this must be defined explicitly in properties calls to avoid a second
+        # label being drawn alongside the property value, in addition to the
+        # label we set above it.
+
+        col.label("Object:")
+        col.prop_search(obj, "TCinitObject",
+                        scn, "objects",
+                        text="",
+                        icon="MESH_DATA")
+
+        col.label("Curve Type:")
+        col.prop(scn, "TCinitCurveType",
+                 text="")
+
+        if scn.TCinitCurveType == '2':
+            col.label("Curve:")
+            col.prop_search(obj, "TCinitCurve",
                             scn, "objects",
-                            text = '',
-                            icon = 'MESH_DATA')
+                            text="",
+                            icon="CURVE_DATA")
 
-            # curve
-            if scn.TCinitCurveType == '2':
-                col.label("Curve")
-                col.prop_search(obj, "TCinitCurve",
-                                scn, "objects",
-                                text = '',
-                                icon = 'CURVE_DATA')
+        col.prop(scn, "TCinitCyclic")
 
-            # options
-            col.prop(scn, "TCinitCyclic")
+        col.label("Cut Depth:")
+        col.prop(scn, "TCinitDepth",
+                 text="")
 
-            col.label("Depth Cut")
-            col.prop(scn, "TCinitDepth", text = '')
+        col.label("Division Spacing:")
+        col.prop(scn, "TCinitDivision",
+                 text="")
 
-            col.label("Division Spacing")
-            col.prop(scn, "TCinitDivision", text = '')
+        if scn.TCinitCyclic == False:
+            col.label("Extrusion Depth:")
+            col.prop(scn, "TCinitExtrusion",
+                     text="")
 
-            # if not cyclic show these options
-            if scn.TCinitCyclic == False:
-                col.label("Extrusion Depth")
-                col.prop(scn, "TCinitExtrusion", text = '')
-                col.prop(scn, "TCinitAxis")
+            col.label("Axis:")
+            col.prop(scn, "TCinitAxis",
+                     text="")
 
-            # more options
-            col.prop(scn, "TCinitApplyMod")
-            col.prop(scn, "TCinitReverseDir")
-            col.prop(scn, "TCinitReverseDepth")
-            col.prop(scn, "TCinitReverseTrim")
-            col.prop(scn, "TCinitReturnMode")
+        col.separator()
+        col.prop(scn, "TCinitApplyMod")
+        col.prop(scn, "TCinitReverseDir")
+        col.prop(scn, "TCinitReverseDepth")
+        col.prop(scn, "TCinitReverseTrim")
 
-            # execute button
-            layout.operator("trim.curves")
-        except:
-            # if fail there were no objects
-            col.label("No Objects in Scene")
+        col.label("Return Mode:")
+        col.prop(scn, "TCinitReturnMode",
+                 text="")
+
+        col.separator()
+        layout.operator("trim.curves",
+                        text="Trim")
 
 
 class OBJECT_OT_trimCurve(bpy.types.Operator):
@@ -135,6 +158,7 @@ class OBJECT_OT_trimCurve(bpy.types.Operator):
 
     bl_idname = "trim.curves"
     bl_label = "Trim Curve"
+    bl_description = "Extrude the curve and use it to trim the mesh object"
 
     def propCalls():
         """
@@ -142,61 +166,78 @@ class OBJECT_OT_trimCurve(bpy.types.Operator):
         a prop is an input field
         this is not required to be in a function, but I like to keep the code clean.
         """
+
+        # In each EnumProperty, name="" is used to suppress the property name
+        # that would otherwise appear in the panel's dropdown boxes.
+
         # create object and curve slot for dropdown
-        bpy.types.Object.TCinitObject = bpy.props.StringProperty()
-        bpy.types.Object.TCinitCurve = bpy.props.StringProperty()
+        bpy.types.Object.TCinitObject = bpy.props.StringProperty(
+            description="Mesh object to trim")
+        bpy.types.Object.TCinitCurve = bpy.props.StringProperty(
+            description="Curve object used to trim the mesh object")
         # curve or grease pencil enum
         bpy.types.Scene.TCinitCurveType = bpy.props.EnumProperty(
-            items = [('1', 'Grease Pencil', 'grease'),
-                     ('2', 'Curve', 'curve')],
-            name = "curveType")
+            items=[("1", "Grease Pencil",
+                    "Use a grease pencil stroke to trim the mesh object"),
+                   ("2", "Curve",
+                    "Use a curve object to trim the mesh object")],
+            name="")
         # create initial value boxes
         bpy.types.Scene.TCinitDepth = FloatProperty(
-            name = "Depth", description = "depth from view", default = 5.00,
-            min = -100, max = 100)
+            name="Depth",
+            description="Depth from view",  # FIXME More informative tooltip
+            default=5.00,
+            min=-100, max=100)
         bpy.types.Scene.TCinitDivision = FloatProperty(
-            name = "Division", description = "Division Spacing", default = 0.5,
-            min = -100, max = 100)
+            name="Division",
+            description="Division spacing",  # FIXME More informative tooltip
+            default=0.5,
+            min=-100, max=100)
         bpy.types.Scene.TCinitExtrusion = FloatProperty(
-            name = "Extrusion", description = "Extrusion Depth", default = 5,
-            min = -100, max = 100)
+            name="Extrusion",
+            description="Extrusion depth",  # FIXME More informative tooltip
+            default=5,
+            min=-100, max=100)
         # axis enum
         bpy.types.Scene.TCinitAxis = bpy.props.EnumProperty(
-            items = [('1', '3D Cursor', 'cursor'),
-                     ('2', 'X', 'x'),
-                     ('3', 'Y', 'y')],
-            name = "axisType")
+            items=[("1", "3D Cursor", "cursor"),  # FIXME More informative tooltip
+                   ("2", "X", "x"),  # FIXME More informative tooltip
+                   ("3", "Y", "y")],  # FIXME More informative tooltip
+            name="")
         # apply modifier
         bpy.types.Scene.TCinitApplyMod = BoolProperty(
-            name = "Apply Boolean",
-            description = "Apply Boolean?",
-            default = True)
+            name="Apply Boolean Modifier",
+            description="Apply the Boolean Modifier used to trim the mesh",
+            default=True)
         # is cyclic or extrude
         bpy.types.Scene.TCinitCyclic = BoolProperty(
-            name = "Cyclic",
-            description = "Disable extrusion and enable cyclic hole?",
-            default = False)
+            name="Cyclic",
+            description="Disable extrusion and enable cyclic hole",  # FIXME More informative tooltip
+            default=False)
         # reverse direction
         bpy.types.Scene.TCinitReverseDir = BoolProperty(
-            name = "Reverse Direction",
-            description = "Reverse Direction",
-            default = False)
+            name="Reverse Direction",
+            description="Reverse the direction of the extrusion",  # FIXME More informative tooltip
+            default=False)
         # reverse depth
-        bpy.types.Scene.TCinitReverseDepth=  BoolProperty(
-            name = "Reverse Depth",
-            description = "Reverse Depth of extrusion",
-            default = False)
+        bpy.types.Scene.TCinitReverseDepth = BoolProperty(
+            name="Reverse Depth",
+            description="Reverse the depth of the extrusion",  # FIXME More informative tooltip
+            default=False)
         # reverse trim
         bpy.types.Scene.TCinitReverseTrim = BoolProperty(
-            name = "Reverse Trim",
-            description = "Reverse Trim",
-            default = False)
+            name="Reverse Trim",
+            description="Keep only the parts of the mesh that intersect with the extruded curve",
+            default=False)
         # return to mode enum
         bpy.types.Scene.TCinitReturnMode = bpy.props.EnumProperty(
-            items = [('1', 'Sculpt', 'sculpt'),
-                     ('2', 'Object', 'object'),
-                     ('3', 'Edit', 'edit')],
-            name = "returnMode")
+            items=[("1", "Sculpt Mode",
+                    "After trimming the mesh, return to Sculpt Mode"),
+                   ("2", "Object Mode",
+                    "After trimming the mesh, return to Object Mode"),
+                   ("3", "Edit Mode",
+                    "After trimming the mesh, return to Edit Mode")],
+            name="")
 
     # Initiate prop calls
     propCalls()
