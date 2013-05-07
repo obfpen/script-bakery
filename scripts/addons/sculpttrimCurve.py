@@ -107,7 +107,7 @@ class TrimCurvesPanel(bpy.types.Panel):
         col.prop(scn, "TCinitCurveType",
                  text="")
 
-        if scn.TCinitCurveType == '2':
+        if scn.TCinitCurveType == "TC_CURVETYPE_CURVE":
             col.label("Curve:")
             col.prop_search(obj, "TCinitCurve",
                             scn, "objects",
@@ -175,9 +175,9 @@ class OBJECT_OT_trimCurve(bpy.types.Operator):
             description="Curve object used to trim the mesh object")
         # curve or grease pencil enum
         bpy.types.Scene.TCinitCurveType = bpy.props.EnumProperty(
-            items=[("1", "Grease Pencil",
+            items=[("TC_CURVETYPE_GREASE", "Grease Pencil",
                     "Use a grease pencil stroke to trim the mesh object"),
-                   ("2", "Curve",
+                   ("TC_CURVETYPE_CURVE", "Curve",
                     "Use a curve object to trim the mesh object")],
             name="")
         # create initial value boxes
@@ -198,9 +198,9 @@ class OBJECT_OT_trimCurve(bpy.types.Operator):
             min=-100, max=100)
         # axis enum
         bpy.types.Scene.TCinitAxis = bpy.props.EnumProperty(
-            items=[("1", "3D Cursor", "cursor"),  # FIXME More informative tooltip
-                   ("2", "X", "x"),  # FIXME More informative tooltip
-                   ("3", "Y", "y")],  # FIXME More informative tooltip
+            items=[("TC_AXIS_CURSOR", "3D Cursor", "cursor"),  # FIXME More informative tooltip
+                   ("TC_AXIS_X", "X", "x"),  # FIXME More informative tooltip
+                   ("TC_AXIS_Y", "Y", "y")],  # FIXME More informative tooltip
             name="")
         # apply modifier
         bpy.types.Scene.TCinitApplyMod = BoolProperty(
@@ -229,11 +229,11 @@ class OBJECT_OT_trimCurve(bpy.types.Operator):
             default=False)
         # return to mode enum
         bpy.types.Scene.TCinitReturnMode = bpy.props.EnumProperty(
-            items=[("1", "Sculpt Mode",
+            items=[("TC_RETURN_SCULPT", "Sculpt Mode",
                     "After trimming the mesh, return to Sculpt Mode"),
-                   ("2", "Object Mode",
+                   ("TC_RETURN_OBJECT", "Object Mode",
                     "After trimming the mesh, return to Object Mode"),
-                   ("3", "Edit Mode",
+                   ("TC_RETURN_EDIT", "Edit Mode",
                     "After trimming the mesh, return to Edit Mode")],
             name="")
 
@@ -252,7 +252,7 @@ class OBJECT_OT_trimCurve(bpy.types.Operator):
         # convert pencil to curve or return curve
         bpy.ops.object.mode_set(mode='OBJECT')
         # 1 = pencil stroke
-        if scn.TCinitCurveType == '1':
+        if scn.TCinitCurveType == "TC_CURVETYPE_GREASE":
             # check if stroke exists
             try:
                 bpy.ops.gpencil.convert(type='PATH')
@@ -414,7 +414,7 @@ class OBJECT_OT_trimCurve(bpy.types.Operator):
             dir = 1
         # only do this if cyclic is false
         if scn.TCinitCyclic == False:
-            if scn.TCinitAxis == '1':
+            if scn.TCinitAxis == "TC_AXIS_CURSOR":
                 # cursor #
                 # calculate local transforms
                 distVecCursor = world2local(curve.location, cursorInit,
@@ -433,7 +433,7 @@ class OBJECT_OT_trimCurve(bpy.types.Operator):
                     i += 1
                 # set pivot to original
                 context.space_data.pivot_point = pivotPoint
-            elif scn.TCinitAxis == '2':
+            elif scn.TCinitAxis == "TC_AXIS_X":
                 # X #
                 # Create transformation matrices
                 localTranslationX = Matrix.Translation((10, 0, 0))
@@ -455,7 +455,7 @@ class OBJECT_OT_trimCurve(bpy.types.Operator):
                         value=distX, constraint_axis=(True, False, False),
                         constraint_orientation='LOCAL')
                     i += 1
-            elif scn.TCinitAxis == '2':
+            elif scn.TCinitAxis == "TC_AXIS_Y":
                 # Y #
                 # Create transformation matrix
                 localTranslationY = Matrix.Translation((0, 10, 0))
@@ -508,9 +508,9 @@ class OBJECT_OT_trimCurve(bpy.types.Operator):
             bpy.ops.object.delete(use_global=False)
 
         # return to mode
-        if scn.TCinitReturnMode == '1':
+        if scn.TCinitReturnMode == "TC_RETURN_SCULPT":
             bpy.ops.sculpt.sculptmode_toggle()
-        elif scn.TCinitReturnMode == '3':
+        elif scn.TCinitReturnMode == "TC_RETURN_EDIT":
             bpy.ops.object.mode_set(mode='EDIT')
         else:
             bpy.ops.object.mode_set(mode='OBJECT')
