@@ -24,10 +24,8 @@ Description:
 Warning:
     This script is currently in a public Beta release, there are bugs and I recommend you take a backup of your work, I take no responsibility in any part either direct or in-direct at the loss of any work. Use at your own risk.
 KNOWN BUGS:
-    On line 369-ish I extrude away from the camera, this needs to be reworked as it is un-predictable.
+    On line 367-ish I extrude away from the camera, this needs to be reworked as it is un-predictable.
 """
-
-from math import *
 
 import bpy
 from bpy.props import *
