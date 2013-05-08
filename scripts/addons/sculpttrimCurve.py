@@ -24,7 +24,7 @@ Description:
 Warning:
     This script is currently in a public Beta release, there are bugs and I recommend you take a backup of your work, I take no responsibility in any part either direct or in-direct at the loss of any work. Use at your own risk.
 KNOWN BUGS:
-    On line 421-ish I extrude away from the camera, this needs to be reworked as it is un-predictable.
+    On line 490-ish I extrude away from the camera, this needs to be reworked as it is un-predictable.
 """
 
 import bpy
@@ -253,7 +253,7 @@ class OBJECT_OT_trimCurve(bpy.types.Operator):
             """
             bpy.ops.object.select_all(action="DESELECT")
             object_to_select.select = True
-            context.scene.objects.active = object_to_select
+            bpy.context.scene.objects.active = object_to_select
 
         def convert_curve_to_mesh(curve_object):
             """Helper function to convert the curve to a mesh, making it cyclic
@@ -271,6 +271,105 @@ class OBJECT_OT_trimCurve(bpy.types.Operator):
                 bpy.ops.object.mode_set(mode="OBJECT")
 
             bpy.ops.object.convert(target="MESH", keep_original=False)
+
+        def align_object_local_axes_with_view(object_to_align):
+            """Helper function to align an object's local transformation axes
+            with the view's transformation axes.
+            """
+
+            def get_view_rotation_euler():
+                """Returns an Euler rotation vector for the current view."""
+
+                # The current implementation of this function changes the
+                # selection, so we store the existing selection here for later
+                # restoration.
+                original_selection = bpy.context.selected_objects
+                original_active = bpy.context.scene.objects.active
+
+                # We can get the view's orientation indirectly by creating an
+                # Empty aligned to the viewport, then getting its orientation
+                # instead.
+                # Creating a new Vector is necessary to keep a copy of the
+                # value after the Empty (and references to it)
+                # has been removed.
+                bpy.ops.object.select_all(action="DESELECT")
+                bpy.ops.object.empty_add(type="PLAIN_AXES", view_align=True)
+                empty = bpy.context.selected_objects[0]
+                view_rotation_euler = Vector(empty.rotation_euler)
+                select_exclusively_and_activate(empty)
+                bpy.ops.object.delete()
+
+                # Restore the original selection
+                for ob in original_selection:
+                    ob.select = True
+                bpy.context.scene.objects.active = original_active
+
+                return view_rotation_euler
+
+            def rotate_object_counterrotate_mesh(object_to_rotate,
+                                                 radians, axis):
+                """Rotates an object but rotates its mesh in the opposite
+                direction, giving it a new rotation vector yet leaving it with
+                the same appearance within the scene.
+                """
+                # Save the original mode, then switch to Object Mode and save
+                # the selection.
+                original_mode = bpy.context.mode
+                bpy.ops.object.mode_set(mode="OBJECT")
+
+                original_selection = bpy.context.selected_objects
+                original_active = bpy.context.scene.objects.active
+
+                # Rotate the object.
+                select_exclusively_and_activate(object_to_rotate)
+                bpy.ops.transform.rotate(value=radians, axis=axis,
+                                            constraint_orientation="GLOBAL")
+
+                # In Edit Mode, rotate all the vertices in the opposite
+                # direction.
+                bpy.ops.object.mode_set(mode="EDIT")
+                bpy.ops.mesh.select_all(action="SELECT")
+                bpy.ops.transform.rotate(value=-radians, axis=axis,
+                                            constraint_orientation="GLOBAL")
+
+                # Restore the original selection and mode.
+                bpy.ops.object.mode_set(mode="OBJECT")
+                for ob in original_selection:
+                    ob.select = True
+                bpy.context.scene.objects.active = original_active
+                bpy.ops.object.mode_set(mode=original_mode)
+
+            # We'll need to move the cursor and pivot point, so we'll save
+            # their current locations for later restoration.
+            # Creating a new Vector is needed for the cursor in order to get
+            # the current value, rather than a (changeable) reference.
+            cursor_initial_location = Vector(bpy.context.scene.cursor_location)
+            pivot_point_initial = bpy.context.space_data.pivot_point
+
+            # Place the object's origin, the cursor, and the pivot at the
+            # centre of the object, to permit an in-place rotation of the
+            # object's vertices.
+            select_exclusively_and_activate(object_to_align)
+            bpy.ops.object.origin_set(type="ORIGIN_GEOMETRY", center="MEDIAN")
+            bpy.context.scene.cursor_location = object_to_align.location
+            bpy.context.space_data.pivot_point = "CURSOR"
+
+            # Apply the rotation to zero out the rotation vector, then rotate
+            # the object to match the view's rotation vector, but rotate the
+            # mesh back to its original location to produce no apparent change.
+            bpy.ops.object.transform_apply(location=False, rotation=True,
+                                           scale=False)
+            view_rotation_euler = get_view_rotation_euler()
+            rotate_object_counterrotate_mesh(object_to_align,
+                                             view_rotation_euler.x, (1, 0, 0))
+            rotate_object_counterrotate_mesh(object_to_align,
+                                             view_rotation_euler.y, (0, 1, 0))
+            rotate_object_counterrotate_mesh(object_to_align,
+                                             view_rotation_euler.z, (0, 0, 1))
+
+            # Put the pivot point and cursor back where we found them.
+            context.space_data.pivot_point = pivot_point_initial
+            bpy.context.scene.cursor_location = cursor_initial_location
 
         def add_boolean_modifier(target_object, modifying_object):
             """Helper function to add a Boolean modifier to the target object.
@@ -371,40 +470,10 @@ class OBJECT_OT_trimCurve(bpy.types.Operator):
 
         convert_curve_to_mesh(curve)
 
-        # rotate curve pivot to view for local transformations #
+        align_object_local_axes_with_view(curve)
 
-        select_exclusively_and_activate(curve)
-        # center origin
-        bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY', center='MEDIAN')
-        # get cursor location, set to vector to break link
         cursorInit = Vector(bpy.context.scene.cursor_location)
-        # add temporary empty
-        bpy.ops.object.empty_add(type='PLAIN_AXES', view_align=True)
-        # assign the emtpy to a variable
-        for ob in bpy.context.selected_objects:
-                if ob.name.startswith("Empty"):
-                    empty = ob
-
-        # get pivot
         pivotPoint = context.space_data.pivot_point
-        # set cursor location to curve
-        bpy.context.scene.cursor_location = curve.location
-        # rotate around cursor
-        context.space_data.pivot_point = "CURSOR"
-        select_exclusively_and_activate(curve)
-        # apply rotation
-        bpy.ops.object.transform_apply(location=False, rotation=True,
-                                       scale=False)
-        # rotate pivot of curve to rotation of empty
-        rotatePivot(empty.rotation_euler)
-        # set pivot point back to original
-        context.space_data.pivot_point = pivotPoint
-        # set cursor location back to original
-        bpy.context.scene.cursor_location = cursorInit
-
-        # delete empty
-        select_exclusively_and_activate(empty)
-        bpy.ops.object.delete(use_global=False)
 
         select_exclusively_and_activate(curve)
 
@@ -546,42 +615,6 @@ class OBJECT_OT_trimCurve(bpy.types.Operator):
 
 
 # functions #
-def rotatePivot(rotation):
-    """
-    rotatePivot(Vector rotation)
-    This function will take a vector rotation and rotate the curently selected objects pivot to match without affecting their physical display
-    Make sure that you rotate around the cursor and have the entire mesh selected or this will not work.
-    This operates on an xyz euler.
-    """
-    # Rotate in object mode X
-    bpy.ops.object.mode_set(mode='OBJECT')
-    bpy.ops.transform.rotate(value=rotation.x, axis=(1, 0, 0),
-                             constraint_orientation='GLOBAL')
-    # rotate in edit mode X
-    bpy.ops.object.mode_set(mode='EDIT')
-    bpy.ops.mesh.select_all(action='SELECT')
-    bpy.ops.transform.rotate(value=-rotation.x, axis=(1, 0, 0),
-                             constraint_orientation='GLOBAL')
-    # Rotate in object mode Y
-    bpy.ops.object.mode_set(mode='OBJECT')
-    bpy.ops.transform.rotate(value=rotation.y, axis=(0, 1, 0),
-                             constraint_orientation='GLOBAL')
-    # rotate in edit mode Y
-    bpy.ops.object.mode_set(mode='EDIT')
-    bpy.ops.transform.rotate(value=-rotation.y, axis=(0, 1, 0),
-                             constraint_orientation='GLOBAL')
-    # Rotate in object mode Z
-    bpy.ops.object.mode_set(mode='OBJECT')
-    bpy.ops.transform.rotate(value=rotation.z, axis=(0, 0, 1),
-                             constraint_orientation='GLOBAL')
-    # rotate in edit mode Z
-    bpy.ops.object.mode_set(mode='EDIT')
-    bpy.ops.transform.rotate(value=-rotation.z, axis=(0, 0, 1),
-                             constraint_orientation='GLOBAL')
-    # return to object mode
-    bpy.ops.object.mode_set(mode='OBJECT')
-
-
 def world2local(a, b, depth):
     """
     Returns a scaled transformation vector between the given vectors.
