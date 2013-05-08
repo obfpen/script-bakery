@@ -24,7 +24,7 @@ Description:
 Warning:
     This script is currently in a public Beta release, there are bugs and I recommend you take a backup of your work, I take no responsibility in any part either direct or in-direct at the loss of any work. Use at your own risk.
 KNOWN BUGS:
-    On line 362-ish I extrude away from the camera, this needs to be reworked as it is un-predictable.
+    On line 421-ish I extrude away from the camera, this needs to be reworked as it is un-predictable.
 """
 
 import bpy
@@ -255,14 +255,92 @@ class OBJECT_OT_trimCurve(bpy.types.Operator):
             object_to_select.select = True
             context.scene.objects.active = object_to_select
 
+        def convert_curve_to_mesh(curve_object):
+            """Helper function to convert the curve to a mesh, making it cyclic
+            if required.
+            """
+            select_exclusively_and_activate(curve_object)
+
+            if scn.TCinitCyclic:
+                bpy.ops.object.mode_set(mode="EDIT")
+                bpy.ops.curve.select_all(action="SELECT")
+
+                for spline in curve_object.data.splines:
+                    spline.use_cyclic_u = True
+
+                bpy.ops.object.mode_set(mode="OBJECT")
+
+            bpy.ops.object.convert(target="MESH", keep_original=False)
+
+        def add_boolean_modifier(target_object, modifying_object):
+            """Helper function to add a Boolean modifier to the target object.
+            If Scene.TCinitReverseTrim is True, the result will be the
+            intersection with the modifying object; if False, it will be the
+            difference.
+            """
+            select_exclusively_and_activate(target_object)
+
+            # NOTE Here we assume the target object has no Boolean modifiers
+            # already, as "Boolean" is the name given to the first one.
+            bpy.ops.object.modifier_add(type="BOOLEAN")
+            bpy.context.object.modifiers["Boolean"].object = modifying_object
+
+            boolean_mode = "DIFFERENCE"
+            if scn.TCinitReverseTrim:
+                boolean_mode = "INTERSECT"
+            bpy.context.object.modifiers["Boolean"].operation = boolean_mode
+
+        def apply_boolean_modifier(target_object, modifying_object):
+            """Helper function to apply all Boolean modifiers belonging to the
+            target object, and to delete the modifying object.
+            """
+            select_exclusively_and_activate(target_object)
+
+            # NOTE Here we assume that the target object has no user-set
+            # Boolean modifiers they want to keep. This is in keeping with the
+            # assumption made in creating the modifier.
+            for mod in bpy.context.object.modifiers:
+                if mod.type == "BOOLEAN":
+                    bpy.ops.object.modifier_apply(apply_as="DATA",
+                                                  modifier=mod.name)
+
+            # NOTE The following lines cannot be replaced by
+            # select_exclusively_and_activate(modifying_object) as the
+            # activation causes an error.
+            bpy.ops.object.select_all(action="DESELECT")
+            modifying_object.select = True
+
+            bpy.ops.object.delete(use_global=False)
+
+        def set_return_mode(return_enum_value):
+            """Helper function to set the return mode."""
+            modes = {"TC_RETURN_EDIT": "EDIT",
+                     "TC_RETURN_OBJECT": "OBJECT",
+                     "TC_RETURN_SCULPT": "SCULPT"}
+
+            if return_enum_value not in modes:
+                self.report({"DEBUG"},
+                            'Unknown value: ' + return_enum_value)
+            else:
+                bpy.ops.object.mode_set(mode=modes[return_enum_value])
+
         # The operator's properties extend the Object and Scene data.
         obj = context.object
         scn = context.scene
 
         # Trim function #
-        # convert pencil to curve or return curve
         bpy.ops.object.mode_set(mode='OBJECT')
-        # 1 = pencil stroke
+
+        # check if mesh exists
+        try:
+            # create mesh variable
+            mesh = bpy.data.objects[obj.TCinitObject]
+        except:
+            print('mesh does not exist')
+            self.report({'WARNING'}, "No mesh selected.")
+            return{'FINISHED'}
+
+        # convert pencil to curve or return curve
         if scn.TCinitCurveType == "TC_CURVETYPE_GREASE":
             # check if stroke exists
             try:
@@ -291,26 +369,7 @@ class OBJECT_OT_trimCurve(bpy.types.Operator):
                 self.report({'WARNING'}, "No curve selected.")
                 return{'FINISHED'}
 
-        # check if mesh exists
-        try:
-            # create mesh variable
-            mesh = bpy.data.objects[obj.TCinitObject]
-        except:
-            print('mesh does not exist')
-            self.report({'WARNING'}, "No mesh selected.")
-            return{'FINISHED'}
-
-        select_exclusively_and_activate(curve)
-        # edit curve
-        bpy.ops.object.mode_set(mode='EDIT')
-        bpy.ops.curve.select_all(action='SELECT')
-        # if cyclic set to cyclic
-        if scn.TCinitCyclic == True:
-            for spline in curve.data.splines:
-                spline.use_cyclic_u = True
-        # object mode and convert to mesh
-        bpy.ops.object.mode_set(mode='OBJECT')
-        bpy.ops.object.convert(target='MESH', keep_original=False)
+        convert_curve_to_mesh(curve)
 
         # rotate curve pivot to view for local transformations #
 
@@ -474,49 +533,15 @@ class OBJECT_OT_trimCurve(bpy.types.Operator):
         # set object mode
         bpy.ops.object.mode_set(mode='OBJECT')
 
-        # create boolean #
-        # set mesh as active
-        bpy.context.scene.objects.active = mesh
-        # add boolean modifier
-        bpy.ops.object.modifier_add(type='BOOLEAN')
-        # if reverse is true set to intersect
-        if scn.TCinitReverseTrim == True:
-            bpy.context.object.modifiers["Boolean"].operation = 'INTERSECT'
-        else:
-            bpy.context.object.modifiers["Boolean"].operation = 'DIFFERENCE'
-        bpy.context.object.modifiers["Boolean"].object = curve
+        add_boolean_modifier(mesh, curve)
+        if scn.TCinitApplyMod:
+            apply_boolean_modifier(mesh, curve)
 
-        # apply boolean object
-        if scn.TCinitApplyMod == True:
-            # set mesh as active
-            bpy.context.scene.objects.active = mesh
-            # apply all boolean modifiers
-            for mod in bpy.context.object.modifiers:
-                if mod.type == 'BOOLEAN':
-                    bpy.ops.object.modifier_apply(apply_as='DATA',
-                                                  modifier=mod.name)
+        set_return_mode(scn.TCinitReturnMode)
 
-            # The following lines cannot be replaced by
-            # select_exclusively_and_activate(curve) as the activation causes
-            # an error.
-
-            # deselect mesh
-            bpy.ops.object.select_all(action='DESELECT')
-            # select curve
-            curve.select = True
-
-            # delete curve
-            bpy.ops.object.delete(use_global=False)
-
-        # return to mode
-        if scn.TCinitReturnMode == "TC_RETURN_SCULPT":
-            bpy.ops.sculpt.sculptmode_toggle()
-        elif scn.TCinitReturnMode == "TC_RETURN_EDIT":
-            bpy.ops.object.mode_set(mode='EDIT')
-        else:
-            bpy.ops.object.mode_set(mode='OBJECT')
         # set pivot to cursor
         context.space_data.pivot_point = "BOUNDING_BOX_CENTER"
+
         return{'FINISHED'}
 
 
